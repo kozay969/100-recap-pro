@@ -3,20 +3,24 @@ import json
 import streamlit as st
 import assemblyai as aai
 from google import genai
-from google.genai import types
 from gtts import gTTS
-from moviepy.editor import VideoFileClip, AudioFileClip
-from utils.subtitle_utils import validate_subtitle_timing
+
+# Safe Import for MoviePy to prevent cloud crash
+try:
+    from moviepy.editor import VideoFileClip, AudioFileClip
+    MOVIEPY_AVAILABLE = True
+except ImportError:
+    MOVIEPY_AVAILABLE = False
 
 # Page Setup
 st.set_page_config(
-    page_title="Advanced AI Movie Recap Pipeline",
+    page_title="AI Movie Recap Pipeline",
     page_icon="🎬",
     layout="wide"
 )
 
-st.title("🎬 Advanced AI Movie Recap Tool (AssemblyAI + Gemini API)")
-st.markdown("ဗီဒီယိုမှ စာသားထုတ်ခြင်း၊ Gemini API ဖြင့် တိုက်ရိုက်ဘာသာပြန်ဆိုခြင်းနှင့် အသံထုတ်လုပ်ခြင်းများကို တစ်နေရာတည်းတွင် လုပ်ဆောင်ပါ။")
+st.title("🎬 AI Movie Recap Tool (Safe Version)")
+st.markdown("AssemblyAI ဖြင့် စာသားထုတ်ခြင်း၊ Gemini API ဖြင့် ဘာသာပြန်ခြင်းနှင့် အသံထုတ်လုပ်ခြင်းများကို လွယ်ကူစွာ လုပ်ဆောင်ပါ။")
 
 # Sidebar for API Keys
 st.sidebar.header("🔑 API Configuration")
@@ -27,7 +31,7 @@ if assemblyai_api_key:
     aai.settings.api_key = assemblyai_api_key
 
 # Tabs Layout
-tab1, tab2, tab3 = st.tabs(["1. Video & Transcript", "2. Gemini Direct Translation", "3. Audio & Video Sync"])
+tab1, tab2, tab3 = st.tabs(["1. Video & Transcript", "2. Gemini Direct Translation", "3. Audio & Sync"])
 
 with tab1:
     st.header("Step 1: ဗီဒီယိုတင်ခြင်းနှင့် စာသားထုတ်ခြင်း")
@@ -40,11 +44,11 @@ with tab1:
         
         st.video(video_path)
         
-        if st.button("🚀 AssemblyAI ဖြင့် စာသားနှင့် Timing ထုတ်မည်"):
+        if st.button("🚀 AssemblyAI ဖြင့် စာသားထုတ်မည်"):
             if not assemblyai_api_key:
                 st.error("ကျေးဇူးပြု၍ Sidebar တွင် AssemblyAI API Key ထည့်ပါ။")
             else:
-                with st.spinner("AssemblyAI ဖြင့် အသံများကို စာသားပြောင်းနေပါပြီ..."):
+                with st.spinner("AssemblyAI ဖြင့် စာသားပြောင်းနေပါပြီ... ခဏစောင့်ပါ။"):
                     try:
                         transcriber = aai.Transcriber()
                         transcript = transcriber.transcribe(video_path)
@@ -55,36 +59,19 @@ with tab1:
                             st.success("စာသားထုတ်ယူမှု အောင်မြင်ပါသည်။")
                             st.session_state['transcript_text'] = transcript.text
                             
-                            # Utterances or segments if available
-                            segments = [{"start": u.start, "end": u.end, "text": u.text} for u in transcript.utterances] if transcript.utterances else []
-                            st.session_state['segments'] = segments
-                            
-                            # JSON format for backup or prompt
-                            payload = {"full_text": transcript.text, "segments": segments}
-                            st.session_state['transcript_json'] = json.dumps(payload, ensure_ascii=False, indent=4)
-                            
                     except Exception as e:
                         st.error(f"အမှားအယွင်း ဖြစ်ပေါ်သည်: {e}")
 
     if 'transcript_text' in st.session_state:
         st.subheader("📝 ထွက်လာသော မူရင်းစာသား")
         st.text_area("Transcript", st.session_state['transcript_text'], height=150)
-        
-        if 'segments' in st.session_state and st.session_state['segments']:
-            st.subheader("⏱️ Subtitle Timing စစ်ဆေးချက်များ")
-            timing_issues = validate_subtitle_timing(st.session_state['segments'])
-            if timing_issues:
-                for issue in timing_issues[:5]:
-                    st.warning(issue)
-            else:
-                st.info("Subtitle အချိန်ကိုက်မှာ သင့်လျော်မှု ရှိပါသည်။")
 
 with tab2:
     st.header("Step 2: Gemini API ဖြင့် တိုက်ရိုက်ဘာသာပြန်ဆိုခြင်း")
     
     recap_tone = st.selectbox(
         "Recap Narration ပုံစံရွေးချယ်ရန်",
-        ["စိတ်လှုပ်ရှားဖွယ်ရာ (Exciting & Dramatic)", "ပြေပြစ်ရှင်းလືင်းသော (Smooth & Clear)", "ဟာသနှောသော (Humorous)"]
+        ["စိတ်လှုပ်ရှားဖွယ်ရာ (Exciting & Dramatic)", "ပြေပြစ်ရှင်းလင်းသော (Smooth & Clear)"]
     )
     
     if st.button("✨ Gemini API ဖြင့် မြန်မာဘာသာသို့ ဘာသာပြန်မည်"):
@@ -93,14 +80,12 @@ with tab2:
         elif 'transcript_text' not in st.session_state:
             st.warning("ကျေးဇူးပြု၍ ပထမအဆင့်တွင် စာသားများ အရင်ထုတ်ပါ။")
         else:
-            with st.spinner("Gemini API မှ ဇာတ်ကြောင်းပြန် (Movie Recap) ပုံစံဖြင့် ဘာသာပြန်နေပါပြီ..."):
+            with st.spinner("Gemini API မှ ဇာတ်ကြောင်းပြန် ပုံစံဖြင့် ဘာသာပြန်နေပါပြီ..."):
                 try:
-                    # Initialize Gemini Client using official google-genai SDK
                     client = genai.Client(api_key=gemini_api_key)
-                    
                     prompt = f"""
                     သင်သည် ပရော်ဖက်ရှင်နယ် Movie Recap ရေးသားသူတစ်ဦး ဖြစ်ပါသည်။ 
-                    အောက်ပါ မူရင်းအင်္ဂလိပ်စာသားများကို ပရိသတ်စိတ်ဝင်စားစေရန် '{recap_tone}' ပုံစံဖြင့် မြန်မာဘာသာသို့ ဇာတ်ကြောင်းပြန်အဖြစ် ဘာသာပြန်ဆိုပေးပါ။ 
+                    အောက်ပါ အင်္ဂလိပ်စာသားများကို ပရိသတ်စိတ်ဝင်စားစေရန် '{recap_tone}' ပုံစံဖြင့် မြန်မာဘာသာသို့ ဇာတ်ကြောင်းပြန်အဖြစ် ဘာသာပြန်ဆိုပေးပါ။ 
                     ရလဒ်ကို မြန်မာဘာသာ သက်သက်ဖြင့်သာ တိုက်ရိုက်ထုတ်ပေးပါ။
                     
                     မူရင်းစာသား:
@@ -124,7 +109,7 @@ with tab2:
         st.session_state['translated_text'] = edited_translation
 
 with tab3:
-    st.header("Step 3: အသံထုတ်ခြင်းနှင့် ဗီဒီယိုနှင့်ကိုက်ညီအောင် ပေါင်းစပ်ခြင်း")
+    st.header("Step 3: အသံထုတ်ခြင်းနှင့် ဗီဒီယိုနှင့်ကိုက်ညီအောင် ပြုလုပ်ခြင်း")
     
     if 'translated_text' in st.session_state and st.session_state['translated_text']:
         if st.button("🔊 gTTS ဖြင့် မြန်မာအသံဖိုင် ထုတ်မည်"):
@@ -135,31 +120,31 @@ with tab3:
                 st.session_state['audio_path'] = audio_path
                 st.success("အသံဖိုင် အောင်မြင်စွာ ထွက်ရှိလာပါပြီ။")
                 
-        if 'audio_path' in st.session_state and os.path.exists('temp_video.mp4'):
+        if 'audio_path' in st.session_state:
             st.audio(st.session_state['audio_path'])
             
-            if st.button("🎬 ဗီဒီယိုနှင့် အသံကို ကိုက်ညီအောင် ပေါင်းစပ်မည်"):
-                with st.spinner("ဗီဒီယိုနှင့် အသံကို ပေါင်းစပ်နေပါပြီ..."):
-                    try:
-                        video_clip = VideoFileClip("temp_video.mp4")
-                        audio_clip = AudioFileClip(st.session_state['audio_path'])
-                        
-                        final_clip = video_clip.set_audio(audio_clip)
-                        output_video_path = "final_recap_video.mp4"
-                        final_clip.write_videofile(output_video_path, codec="libx264", audio_codec="aac")
-                        
-                        st.success("Final Recap Video ထွက်ရှိပါပြီ!")
-                        st.video(output_video_path)
-                        
-                        with open(output_video_path, "rb") as file:
-                            st.download_button(
-                                label="📥 Final Recap Video ကို Download ရယူမည်",
-                                data=file,
-                                file_name="movie_recap_output.mp4",
-                                mime="video/mp4"
-                            )
-                    except Exception as e:
-                        st.error(f"ဗီဒီယိုပေါင်းစပ်ရာတွင် အမှားဖြစ်ပေါ်သည်: {e}")
+            with open(st.session_state['audio_path'], "rb") as audio_file:
+                st.download_button(
+                    label="📥 အသံဖိုင် (MP3) ကို Download ရယူမည်",
+                    data=audio_file,
+                    file_name="recap_audio.mp3",
+                    mime="audio/mp3"
+                )
+                
+            if MOVIEPY_AVAILABLE and os.path.exists('temp_video.mp4'):
+                if st.button("🎬 ဗီဒီယိုနှင့် အသံကို ပေါင်းစပ်မည်"):
+                    with st.spinner("ဗီဒီယိုနှင့် အသံကို ပေါင်းစပ်နေပါပြီ..."):
+                        try:
+                            video_clip = VideoFileClip("temp_video.mp4")
+                            audio_clip = AudioFileClip(st.session_state['audio_path'])
+                            final_clip = video_clip.set_audio(audio_clip)
+                            output_video_path = "final_recap_video.mp4"
+                            final_clip.write_videofile(output_video_path, codec="libx264", audio_codec="aac")
+                            
+                            st.success("Final Recap Video ထွက်ရှိပါပြီ!")
+                            st.video(output_video_path)
+                        except Exception as e:
+                            st.error(f"ဗီဒီယိုပေါင်းစပ်ရာတွင် အမှားဖြစ်ပေါ်သည်: {e}")
     else:
         st.warning("ကျေးဇူးပြု၍ Step 2 တွင် ဘာသာပြန်စာသားများ အရင်ရယူပါ။")
-           
+        
